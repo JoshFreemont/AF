@@ -21,10 +21,13 @@
 
 class cell
 {
+    //experiment variables
     int RP;//refractory period
     double Eta_N;//dysfunctionality of north connection parameter
     double Eta_S;//dysfunctionality of south connection parameter
     double Epsilon;//dysfunctionality of a cell parameter
+    
+    //awareness parameters
     int exFrame;//frame of excitation
     cell* exBy;//cell from which current cell was last excited.
     std::vector<cell*> neighbours;//vector of pointers to neighbours stored as [0]=N, [1]=E, [2]=S, [3]=W. MAKE THIS A POINTER OF POINTERS
@@ -36,11 +39,11 @@ public:
     void init(int RP);//initialize dynamic variables
     void setCellRelations(cell* lattice1D, int SIZE, int maxY);//set positional relations, "self" and "neighbours".
     void setEpsilon(double Epsilon);
-    double getEpsilon();
     void setEtaN(double Epsilon);
     void setEtaS(double Epsilon);
     double getEtaN();
     double getEtaS();
+    double getEpsilon();
     int getCoord1D();
     std::pair<int,int> getCoord2d();
     cell* getExBy();

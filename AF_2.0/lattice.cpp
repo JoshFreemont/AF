@@ -167,12 +167,13 @@ std::vector<int> lattice2D::getExcitedCoords()
 }
 
 //DetectRtrs
-//do not care about rotor identification.
+//do not care about rotor identification, only detection.
 //for each excited cell site get chain of excited cells which may form a rotor
 std::vector<int> lattice2D::detectRtrs(int maxLength, int maxX, int maxY)
 {
     //declare rotors pixel data.
     std::vector<int> rotors;
+    rotors.reserve(SIZE*SIZE);
     for(auto coord = newExCoords.begin(); coord != newExCoords.end(); coord++)
     {
         //declare local variables.
@@ -187,9 +188,9 @@ std::vector<int> lattice2D::detectRtrs(int maxLength, int maxX, int maxY)
         //check excited chain is physical
         if(!chain.size()) continue;//if chain length==0: skip to next coords.
         //look for repeats.
-        for(int i = minRepeatLength; i < maxLength; i++)
+        for(int i = minRepeatLength; i < chain.size(); i++)
         {
-            if(chain[i-1] == exCoord1D)
+            if(chain[i-1] == exCoord1D)//if a loop is formed
             {
                 chain.erase(chain.begin()+i, chain.end());//erase elements beyond the repeat.
                 for(auto it = chain.begin(); it != chain.end(); it++)
@@ -212,58 +213,70 @@ std::vector<std::vector<int> > lattice2D::detectSimpleReEntry(int minLength)
 {
     std::vector<int> reEntry1D (SIZE*SIZE, 0);//1d vector for re-entry structure count (indexed by 1d cell coord)
     
-    int vertN1 = 0,vertN2 = 0,vertS1 = 0,vertS2 = 0;
+    int vertN = -1, vertS = -1;
     for(int i = 0; i < SIZE*SIZE; i++)//iterate over 1d lattice
     {
-        //if north vertical or if at end of row.
-        if(lattice1D[i].getEtaN() != 0.0 || i%SIZE == 0)
+        //check for north vertical
+        if(lattice1D[i].getEtaN() != 0.0)
         {
-            vertN2 = i;//set vertN2 to current location.
-            if(vertN2 - vertN1 > minLength)//if interval is large enough for re-entry check for defects.
+            //check if is first vert in row
+            if(vertN == -1)
+            {
+                vertN = i;
+                continue;
+            }//set vertN and go to next vert.
+            //check interval between vert i and vertN.
+            if(i - vertN > minLength)//if interval is large enough for re-entry check for defects.
             {
                 int reEntryCount = 0;//reEntryCount counts how many re-entry circuits are detected
-                for(int j = vertN1; j <= vertN2; j++)//iterate from vertN1 forwards
+                for(int j = vertN; j < i; j++)//iterate from vertN forwards obeying reEntry length condition
                 {
                     //if defect exists obeying condition for re-entry: add to reEntry count
-                    if((j < vertN2 - minLength) && lattice1D[j].getEpsilon() != 0.0){reEntryCount ++;}
+                    if((j < i - minLength) && lattice1D[j].getEpsilon() != 0.0){reEntryCount ++;}
                     reEntry1D[j] += reEntryCount;//add count to 1d re-entry vector.
                 }
-                reEntryCount = 0;
-                for(int j = vertN2; j >= vertN1; j--)//iterate from vertN2 backwards checking defect.
+                reEntryCount = 0;//reset reEntryCount and iterate backwards obeying reentry length condition
+                for(int j = i; j > vertN; j--)//iterate from vertN backwards checking defect.
                 {
                     //if defect exists obeying condition for re-entry: add to reEntry count
-                    if((j > vertN1 + minLength) && lattice1D[j].getEpsilon() != 0.0){reEntryCount ++;}
+                    if((j > vertN + minLength) && lattice1D[j].getEpsilon() != 0.0){reEntryCount ++;}
                     reEntry1D[j] += reEntryCount;//add count to 1d re-entry vector.
                 }
             }
-            vertN1 = vertN2;//reassign vertN1
-            if(!i%SIZE) vertN1++;//+1 to position if at end of row: reset vertN1 at start of next row.
+            vertN = i;//reassign vertN
         }
         
         //check south vertical
-        if(lattice1D[i].getEtaS() != 0.0 || i%SIZE == 0)
+        if(lattice1D[i].getEtaS() != 0.0)
         {
-            vertS2 = i;
-            if(vertS2 - vertS1 > minLength)//if interval is large enough for re-entry.
+            //check if first vert in row
+            if(vertS == -1){vertS = i; continue;}
+            //check interval between vert i and vertS
+            if(i - vertS > minLength)//if interval is large enough for re-entry.
             {
                 int reEntryCount = 0;
-                for(int j = vertS1; j <= vertS2; j++)//iterate from vertS1 forwards checking defects
+                for(int j = vertS; j <= i; j++)//iterate from vertS forwards checking defects
                 {
                     //if defect exists obeying condition for re-entry: add to reEntry count
-                    if((j < vertS2 - minLength) && lattice1D[j].getEpsilon() != 0.0){reEntryCount ++;}
+                    if((j < i - minLength) && lattice1D[j].getEpsilon() != 0.0){reEntryCount ++;}
                     reEntry1D[j] += reEntryCount;//add count to 1d re-entry vector.
                 }
-                
                 reEntryCount = 0;
-                for(int j = vertS2; j >= vertS1; j--)//iterate from vertS2 backwards checking defect.
+                for(int j = i; j >= vertS; j--)//iterate from i backwards checking defect.
                 {
                     //if elligible defect exists add to reEntry count
-                    if((j > vertS1 + minLength) && lattice1D[j].getEpsilon() != 0.0){reEntryCount ++;}
+                    if((j > vertS + minLength) && lattice1D[j].getEpsilon() != 0.0){reEntryCount ++;}
                     reEntry1D[j] += reEntryCount;//add count to 1d re-entry vector.
                 }
             }
-            vertS1 = vertS2;//reassign vertS1
-            if(!i%SIZE) vertS1++;//+1 to position if at end of row: reset vertN1 at start of next row.
+            vertS = i;//reassign vertS
+        }
+        
+        //reassign vertS and vertN to default if at end of row
+        if((i+1)%SIZE == 0)
+        {
+            vertN = -1;//if at end of row: reset vertN=-1 for start of next row.
+            vertS = -1;//if at end of row: reset vertS=-1 for start of next row.
         }
     }
     
@@ -273,7 +286,7 @@ std::vector<std::vector<int> > lattice2D::detectSimpleReEntry(int minLength)
     {
         for(int j=0; j<SIZE; j++)//iterate through rows
         {
-            reEntry2D[i][j]= reEntry1D[i+SIZE*j];//add data from 1D to 2D vector.
+            reEntry2D[i][j] = reEntry1D[i+SIZE*j];//add data from 1D to 2D vector.
         }
     }
 
